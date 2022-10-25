@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, user-scalable=no"
+    />
+    <!-- <script src="./pan-zoom-master/lib/index.js"></script> -->
+    <title>Mandelbrot Set</title>
+  </head>
+  <body>
+    <canvas id="stage" width="100" , height="100" style="touch-action: none">
+    </canvas>
+    <canvas id="supersample" style="display: none"> </canvas>
+    <div>
+      <input id="max_iter" type="range" max="10000" , min="1" />
+      <span id="max_iter_indicator"></span>
+    </div>
+    <div id="console"></div>
+    <script type="module">
+      import init, { paint, transfer } from "./pkg/rust_wasm_mandelbrot.js";
+      const consolediv = document.querySelector("#console");
+      const maxIter = document.querySelector("#max_iter");
+      const maxIterIndicator = document.querySelector("#max_iter_indicator");
+      const throttle = (fn, delay) => {
+        let lastCalled = 0;
+        return (...args) => {
+          let now = new Date().getTime();
+          if (now - lastCalled < delay) {
+            return;
+          }
+          lastCalled = now;
+          return fn(...args);
+        };
+      };
+
+      const debounce = function (func, timeout = 300) {
+        let timer;
+        return (...args) => {
+          clearTimeout(timer);
+          timer = setTimeout(() => {
+            func.apply(this, args);
+          }, timeout);
+        };
+      };
+
+      let stage = {
+        centerx: 0,
+        centery: 0,
+        scale: 25,
+        superSampleFactor: 1,
+      };
+
+      let max_iter = 100;
+      function render(canvas) {
+        paint(
+          max_iter,
+          stage.centerx,
+          stage.centery,
+          stage.scale,
+          stage.superSampleFactor
+        );
+        transfer(0, 0, canvas.width, canvas.height);
+      }
+      maxIter.value = max_iter;
+      maxIterIndicator.innerHTML = maxIter.value;
+      maxIter.onchange = () => {
+        maxIterIndicator.innerHTML = maxIter.value;
+        max_iter = parseInt(maxIter.value);
+        render(document.querySelector("#stage"));
+      };
+      maxIter.oninput = () => {
+        maxIterIndicator.innerHTML = maxIter.value;
+      };
+
+      function enable_move(canvas) {
+        let basePoint = [0, 0];
+        let evCache = [];
+        let baseDistance = 0;
+        let zoomFactor = 1;
+        function start(ev) {
+          let prev_avg_x =
+            evCache.length == 0
+              ? 0
+              : evCache.map((e) => e.clientX).reduce((v, s) => v + s, 0) /
+                evCache.length;
+          let prev_avg_y =
+            evCache.length == 0
+              ? 0
+              : evCache.map((e) => e.clientY).reduce((v, s) => v + s, 0) /
+                evCache.length;
+          basePoint = [
+            basePoint[0] +
+              (ev.clientX - prev_avg_x) / (evCache.length + 1) / zoomFactor,
+            basePoint[1] +
+              (ev.clientY - prev_avg_y) / (evCache.length + 1) / zoomFactor,
+          ];
+          evCache.push(ev);
+
+          let min_x = Math.min(...evCache.map((e) => e.clientX));
+          let min_y = Math.min(...evCache.map((e) => e.clientY));
+          let max_x = Math.max(...evCache.map((e) => e.clientX));
+          let max_y = Math.max(...evCache.map((e) => e.clientY));
+          baseDistance =
+            Math.sqrt(
+              (max_y - min_y) * (max_y - min_y) +
+                (max_x - min_x) * (max_x - min_x)
+            ) / zoomFactor;
+        }
+        function move(ev) {
+          if (evCache.length === 0) return;
+          const index = evCache.findIndex(
+            (cachedEv) => cachedEv.pointerId === ev.pointerId
+          );
+          index >= 0 && evCache.splice(index, 1, ev);
+          let avg_x =
+            evCache.map((e) => e.clientX).reduce((v, s) => v + s, 0) /
+            evCache.length;
+          let avg_y =
+            evCache.map((e) => e.clientY).reduce((v, s) => v + s, 0) /
+            evCache.length;
+          let min_x = Math.min(...evCache.map((e) => e.clientX));
+          let min_y = Math.min(...evCache.map((e) => e.clientY));
+          let max_x = Math.max(...evCache.map((e) => e.clientX));
+          let max_y = Math.max(...evCache.map((e) => e.clientY));
+          let distance = Math.sqrt(
+            (max_y - min_y) * (max_y - min_y) +
+              (max_x - min_x) * (max_x - min_x)
+          );
+          zoomFactor = distance === 0 ? zoomFactor : distance / baseDistance;
+
+          // let center_x = (max_x - min_x) / 2;
+          // let center_y = (max_y - min_y) / 2;
+          let deltaMovement = [avg_x - basePoint[0], avg_y - basePoint[1]];
+          transfer(
+            deltaMovement[0] + basePoint[0] * (1 - zoomFactor),
+            deltaMovement[1] + basePoint[1] * (1 - zoomFactor),
+            canvas.width * zoomFactor,
+            canvas.height * zoomFactor
+          );
+        }
+        function end(ev) {
+          if (evCache.length === 0) return;
+          const index = evCache.findIndex(
+            (cachedEv) => cachedEv.pointerId === ev.pointerId
+          );
+          if (index >= 0) {
+            // end can be fired multiple times when pointerleave
+            if (evCache.length > 1) {
+              let prev_avg_x =
+                evCache.map((e) => e.clientX).reduce((v, s) => v + s) /
+                evCache.length;
+              let prev_avg_y =
+                evCache.map((e) => e.clientY).reduce((v, s) => v + s) /
+                evCache.length;
+              basePoint = [
+                basePoint[0] +
+                  (prev_avg_x - ev.clientX) / (evCache.length - 1) / zoomFactor,
+                basePoint[1] +
+                  (prev_avg_y - ev.clientY) / (evCache.length - 1) / zoomFactor,
+              ];
+            } else if (evCache.length == 1) {
+              let deltaMovement = [
+                ev.clientX - basePoint[0],
+                ev.clientY - basePoint[1],
+              ];
+              basePoint = [0, 0];
+              // stage.centerx += -deltaMovement[0] / zoomFactor / stage.scale;
+              // stage.centery += deltaMovement[1] / zoomFactor / stage.scale;
+              stage.centerx =
+                stage.centerx +
+                (((ev.clientX - canvas.width / 2) * (zoomFactor - 1)) /
+                  zoomFactor -
+                  deltaMovement[0]) /
+                  stage.scale;
+              stage.centery =
+                stage.centery -
+                (((ev.clientY - canvas.height / 2) * (zoomFactor - 1)) /
+                  zoomFactor -
+                  deltaMovement[1]) /
+                  stage.scale;
+              stage.scale *= zoomFactor;
+              render(canvas);
+              zoomFactor = 1;
+            }
+            evCache.splice(index, 1);
+            let min_x = Math.min(...evCache.map((e) => e.clientX));
+            let min_y = Math.min(...evCache.map((e) => e.clientY));
+            let max_x = Math.max(...evCache.map((e) => e.clientX));
+            let max_y = Math.max(...evCache.map((e) => e.clientY));
+            let distance = Math.sqrt(
+              (max_y - min_y) * (max_y - min_y) +
+                (max_x - min_x) * (max_x - min_x)
+            );
+            baseDistance = distance / zoomFactor;
+          }
+        }
+
+        let topLeftPoint = [0, 0];
+        let scrollZoomFactor = 1;
+        function wheel(ev) {
+          let zoomFactor = ev.deltaY < 0 ? 1.2 : 0.9;
+          scrollZoomFactor *= zoomFactor;
+          topLeftPoint = [
+            ev.clientX - zoomFactor * (ev.clientX - topLeftPoint[0]),
+            ev.clientY - zoomFactor * (ev.clientY - topLeftPoint[1]),
+          ];
+          transfer(
+            topLeftPoint[0],
+            topLeftPoint[1],
+            canvas.width * scrollZoomFactor,
+            canvas.height * scrollZoomFactor
+          );
+          stage.centerx = debounce(() => render(canvas), 1000);
+        }
+
+        canvas.onpointerdown = start;
+        canvas.onpointermove = move;
+        canvas.onpointerup = end;
+        canvas.onpointercancel = end;
+        canvas.onpointerout = end;
+        canvas.onpointerleave = end;
+        canvas.onwheel = wheel;
+      }
+      async function run() {
+        await init();
+        let canvas = document.querySelector("#stage");
+        render(canvas);
+        enable_move(canvas);
+      }
+      run();
+    </script>
+  </body>
+</html>
