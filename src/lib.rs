@@ -2,7 +2,16 @@ use wasm_bindgen::{prelude::*, Clamped, JsCast};
 use web_sys::ImageData;
 
 #[wasm_bindgen]
-pub fn paint(max_iter: u32, center_x: f64, center_y: f64, scale: f64, super_sample_factor: u32) {
+pub fn paint(
+    max_iter: u32,
+    center_x: f64,
+    center_y: f64,
+    scale: f64,
+    super_sample_factor: u32,
+    color_step: u32,
+    color_number: u32,
+    color_shift: u32,
+) {
     let document = web_sys::window().unwrap().document().unwrap();
     let canvas = document
         .get_element_by_id("stage")
@@ -27,6 +36,9 @@ pub fn paint(max_iter: u32, center_x: f64, center_y: f64, scale: f64, super_samp
         scale: scale * super_sample_factor as f64,
         width: super_sample_canvas.width(),
         height: super_sample_canvas.height(),
+        color_step,
+        color_number,
+        color_shift,
     };
     let mandelbrot = Mandelbrot::new(max_iter, stage);
     let data = mandelbrot.gen_image_data();
@@ -74,15 +86,30 @@ pub struct Stage {
     scale: f64,
     width: u32,
     height: u32,
+    color_step: u32,
+    color_number: u32,
+    color_shift: u32,
 }
 
 impl Stage {
-    pub fn new(center_x: f64, center_y: f64, scale: f64, width: u32, height: u32) -> Stage {
+    pub fn new(
+        center_x: f64,
+        center_y: f64,
+        scale: f64,
+        width: u32,
+        height: u32,
+        color_step: u32,
+        color_number: u32,
+        color_shift: u32,
+    ) -> Stage {
         Stage {
             center: (center_x, center_y),
             scale,
             width,
             height,
+            color_step,
+            color_number,
+            color_shift,
         }
     }
 }
@@ -150,13 +177,18 @@ impl Mandelbrot {
         data
     }
     fn gen_color(&self, n: u32) -> [u8; 4] {
+        let shifted_n = self.stage.color_shift * self.stage.color_step + n;
         Mandelbrot::hsva_to_rgba((
-            (n % 24) as f32 / 24. * 360.,
-            (n % 4 + 4) as f32 / 8.,
+            (shifted_n / self.stage.color_step % self.stage.color_number) as f32
+                / self.stage.color_number as f32
+                * 360.,
+            // (shifted_n % self.stage.color_step + self.stage.color_step * 2) as f32 / (self.stage.color_step * 3) as f32,
+            1.,
             if n == self.max_iter {
                 0.
             } else {
-                (n % 4 + 4) as f32 / 8.
+                (shifted_n % self.stage.color_step + self.stage.color_step) as f32
+                    / (self.stage.color_step * 2) as f32
             },
             255u8,
         ))
@@ -241,6 +273,9 @@ pub mod test {
             scale: 100.,
             width: 100,
             height: 100,
+            color_step: 0,
+            color_number: 0,
+            color_shift: 0,
         };
         let a = Mandelbrot::new(100, stage);
         let b = a.escape_time(&ComplexNumber::new(0., 0.));
@@ -253,6 +288,9 @@ pub mod test {
             scale: 100.,
             width: 100,
             height: 100,
+            color_step: 0,
+            color_number: 0,
+            color_shift: 0,
         };
         let a = Mandelbrot::new(100, stage);
         let mut b = a.escape_time_iter();

@@ -11,19 +11,31 @@
     <title>Mandelbrot Set</title>
   </head>
   <body>
-    <canvas id="stage" width="100" , height="100" style="touch-action: none">
+    <canvas id="stage" width="400" , height="400" style="touch-action: none">
     </canvas>
     <canvas id="supersample" style="display: none"> </canvas>
     <div>
+      maximum number of iterations:
       <input id="max_iter" type="range" max="10000" , min="1" />
       <span id="max_iter_indicator"></span>
     </div>
+    <div>
+      super sample:
+      <input id="super_sample" type="number" max="16" , min="1" />
+    </div>
+    <div>
+      color step:
+      <input id="color_step" type="number" max="10" , min="1" />
+      color number:
+      <input id="color_number" type="number" max="100" , min="1" />
+      color shift:
+      <input id="color_shift" type="number" max="100" , min="1" />
+    </div>
+    <div id="stage_info"></div>
     <div id="console"></div>
     <script type="module">
       import init, { paint, transfer } from "./pkg/rust_wasm_mandelbrot.js";
       const consolediv = document.querySelector("#console");
-      const maxIter = document.querySelector("#max_iter");
-      const maxIterIndicator = document.querySelector("#max_iter_indicator");
       const throttle = (fn, delay) => {
         let lastCalled = 0;
         return (...args) => {
@@ -36,12 +48,12 @@
         };
       };
 
-      const debounce = function (func, timeout = 300) {
+      const debounce = function (fn, timeout = 300) {
         let timer;
         return (...args) => {
           clearTimeout(timer);
           timer = setTimeout(() => {
-            func.apply(this, args);
+            fn.apply(this, args);
           }, timeout);
         };
       };
@@ -49,21 +61,23 @@
       let stage = {
         centerx: 0,
         centery: 0,
-        scale: 25,
+        scale: document.querySelector("#stage").width / 4,
         superSampleFactor: 1,
+        color_step: 5,
+        color_number: 24,
+        color_shift: 16,
       };
 
+      const superSample = document.querySelector("#super_sample");
+      superSample.value = stage.superSampleFactor;
+      superSample.onchange = () => {
+        stage.superSampleFactor = parseInt(superSample.value);
+        render(document.querySelector("#stage"));
+      };
+
+      const maxIter = document.querySelector("#max_iter");
+      const maxIterIndicator = document.querySelector("#max_iter_indicator");
       let max_iter = 100;
-      function render(canvas) {
-        paint(
-          max_iter,
-          stage.centerx,
-          stage.centery,
-          stage.scale,
-          stage.superSampleFactor
-        );
-        transfer(0, 0, canvas.width, canvas.height);
-      }
       maxIter.value = max_iter;
       maxIterIndicator.innerHTML = maxIter.value;
       maxIter.onchange = () => {
@@ -75,7 +89,49 @@
         maxIterIndicator.innerHTML = maxIter.value;
       };
 
-      function enable_move(canvas) {
+      const color_step = document.querySelector("#color_step");
+      const color_number = document.querySelector("#color_number");
+      const color_shift = document.querySelector("#color_shift");
+      color_step.value = stage.color_step;
+      color_step.onchange = () => {
+        stage.color_step = parseInt(color_step.value);
+        render(document.querySelector("#stage"));
+      };
+      color_number.value = stage.color_number;
+      color_number.onchange = () => {
+        stage.color_number = parseInt(color_number.value);
+        render(document.querySelector("#stage"));
+      };
+      color_shift.value = stage.color_shift;
+      color_shift.onchange = () => {
+        stage.color_shift = parseInt(color_shift.value);
+        render(document.querySelector("#stage"));
+      };
+      const stageInfo = document.querySelector("#stage_info");
+      function render(canvas) {
+        const start = performance.now();
+        paint(
+          max_iter,
+          stage.centerx,
+          stage.centery,
+          stage.scale,
+          stage.superSampleFactor,
+          stage.color_step,
+          stage.color_number,
+          stage.color_shift
+        );
+        console.log(stage.color_step, stage.color_number, stage.color_shift);
+        const end = performance.now();
+        const renderTime = end - start;
+        transfer(0, 0, canvas.width, canvas.height);
+        let centerx = stage.centerx.toExponential(10);
+        let centery = stage.centery.toExponential(10);
+        stageInfo.innerHTML = `center: (${centerx}, ${centery})`;
+        stageInfo.innerHTML += `, scale: ${stage.scale.toFixed(0)}<br/>`;
+        stageInfo.innerHTML += `render time: ${renderTime.toFixed(0)}ms`;
+      }
+
+      function enable_pan_zoom(canvas) {
         let basePoint = [0, 0];
         let evCache = [];
         let baseDistance = 0;
@@ -130,9 +186,6 @@
               (max_x - min_x) * (max_x - min_x)
           );
           zoomFactor = distance === 0 ? zoomFactor : distance / baseDistance;
-
-          // let center_x = (max_x - min_x) / 2;
-          // let center_y = (max_y - min_y) / 2;
           let deltaMovement = [avg_x - basePoint[0], avg_y - basePoint[1]];
           transfer(
             deltaMovement[0] + basePoint[0] * (1 - zoomFactor),
@@ -167,8 +220,6 @@
                 ev.clientY - basePoint[1],
               ];
               basePoint = [0, 0];
-              // stage.centerx += -deltaMovement[0] / zoomFactor / stage.scale;
-              // stage.centery += deltaMovement[1] / zoomFactor / stage.scale;
               stage.centerx =
                 stage.centerx +
                 (((ev.clientX - canvas.width / 2) * (zoomFactor - 1)) /
@@ -200,6 +251,18 @@
 
         let topLeftPoint = [0, 0];
         let scrollZoomFactor = 1;
+        let wheelZoomRender = debounce(() => {
+          stage.scale *= scrollZoomFactor;
+          stage.centerx -=
+            (((scrollZoomFactor - 1) * canvas.width) / 2 + topLeftPoint[0]) /
+            stage.scale;
+          stage.centery +=
+            (((scrollZoomFactor - 1) * canvas.height) / 2 + topLeftPoint[1]) /
+            stage.scale;
+          render(canvas);
+          topLeftPoint = [0, 0];
+          scrollZoomFactor = 1;
+        });
         function wheel(ev) {
           let zoomFactor = ev.deltaY < 0 ? 1.2 : 0.9;
           scrollZoomFactor *= zoomFactor;
@@ -213,7 +276,7 @@
             canvas.width * scrollZoomFactor,
             canvas.height * scrollZoomFactor
           );
-          stage.centerx = debounce(() => render(canvas), 1000);
+          wheelZoomRender();
         }
 
         canvas.onpointerdown = start;
@@ -228,7 +291,7 @@
         await init();
         let canvas = document.querySelector("#stage");
         render(canvas);
-        enable_move(canvas);
+        enable_pan_zoom(canvas);
       }
       run();
     </script>
