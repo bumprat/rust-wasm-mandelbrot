@@ -7,35 +7,85 @@
       name="viewport"
       content="width=device-width, initial-scale=1.0, user-scalable=no"
     />
-    <!-- <script src="./pan-zoom-master/lib/index.js"></script> -->
+    <style>
+      body {
+        margin: 0px;
+        background-color: #444;
+        overflow: hidden;
+        font-size: 0.5em;
+      }
+      #toolbox {
+        position: absolute;
+        top: 0;
+        left: 0;
+        background-color: #444;
+        color: white;
+        padding: 10px;
+        opacity: 0.5;
+        width: 100px;
+      }
+      #toolbox input {
+        width: 80%;
+      }
+      #stage_info {
+        background-color: grey;
+        padding: 5px;
+        font-size: 0.2em;
+      }
+      #console {
+        overflow-wrap: break-word;
+        background-color: black;
+        padding: 5px;
+        font-size: 0.2em;
+      }
+      #favorites {
+        margin-top: 10px;
+        margin-bottom: 10px;
+      }
+    </style>
     <title>Mandelbrot Set</title>
   </head>
   <body>
     <canvas id="stage" width="400" , height="400" style="touch-action: none">
     </canvas>
     <canvas id="supersample" style="display: none"> </canvas>
-    <div>
-      maximum number of iterations:
-      <input id="max_iter" type="range" max="10000" , min="1" />
-      <span id="max_iter_indicator"></span>
+    <div id="toolbox">
+      <div>
+        iteration:
+        <input id="max_iter" type="number" />
+      </div>
+      <div>
+        oversample:
+        <input id="super_sample" type="number" />
+      </div>
+      <div>
+        color:
+        <div style="padding-left: 1em">
+          <div>
+            step:
+            <input id="color_step" type="number" />
+          </div>
+          <div>
+            number:
+            <input id="color_number" type="number" />
+          </div>
+          <div>
+            shift:
+            <input id="color_shift" type="number" />
+          </div>
+        </div>
+      </div>
+      <div id="favorites">
+        <button id="favorite-add">add</button>
+        <button id="favorite-reset">reset</button>
+      </div>
+      <div id="stage_info"></div>
+      <div id="console"></div>
     </div>
-    <div>
-      super sample:
-      <input id="super_sample" type="number" max="16" , min="1" />
-    </div>
-    <div>
-      color step:
-      <input id="color_step" type="number" max="10" , min="1" />
-      color number:
-      <input id="color_number" type="number" max="100" , min="1" />
-      color shift:
-      <input id="color_shift" type="number" max="100" , min="1" />
-    </div>
-    <div id="stage_info"></div>
-    <div id="console"></div>
     <script type="module">
       import init, { paint, transfer } from "./pkg/rust_wasm_mandelbrot.js";
       const consolediv = document.querySelector("#console");
+
       const throttle = (fn, delay) => {
         let lastCalled = 0;
         return (...args) => {
@@ -58,10 +108,15 @@
         };
       };
 
+      let favoriteAddBtn = document.querySelector("#favorite-add");
+      let favoriteResetBtn = document.querySelector("#favorite-reset");
+      let canvas = document.querySelector("#stage");
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
       let stage = {
         centerx: 0,
         centery: 0,
-        scale: document.querySelector("#stage").width / 4,
+        scale: Math.min(canvas.width, canvas.height) / 4,
         superSampleFactor: 1,
         color_step: 5,
         color_number: 24,
@@ -76,17 +131,11 @@
       };
 
       const maxIter = document.querySelector("#max_iter");
-      const maxIterIndicator = document.querySelector("#max_iter_indicator");
       let max_iter = 100;
       maxIter.value = max_iter;
-      maxIterIndicator.innerHTML = maxIter.value;
       maxIter.onchange = () => {
-        maxIterIndicator.innerHTML = maxIter.value;
         max_iter = parseInt(maxIter.value);
         render(document.querySelector("#stage"));
-      };
-      maxIter.oninput = () => {
-        maxIterIndicator.innerHTML = maxIter.value;
       };
 
       const color_step = document.querySelector("#color_step");
@@ -120,14 +169,14 @@
           stage.color_number,
           stage.color_shift
         );
-        console.log(stage.color_step, stage.color_number, stage.color_shift);
+        document.querySelector("#console").innerHTML = JSON.stringify(stage);
         const end = performance.now();
         const renderTime = end - start;
         transfer(0, 0, canvas.width, canvas.height);
-        let centerx = stage.centerx.toExponential(10);
-        let centery = stage.centery.toExponential(10);
-        stageInfo.innerHTML = `center: (${centerx}, ${centery})`;
-        stageInfo.innerHTML += `, scale: ${stage.scale.toFixed(0)}<br/>`;
+        let centerx = stage.centerx.toExponential(2);
+        let centery = stage.centery.toExponential(2);
+        stageInfo.innerHTML = `center: (${centerx}, ${centery})<br/>`;
+        stageInfo.innerHTML += `scale: ${stage.scale.toFixed(0)}<br/>`;
         stageInfo.innerHTML += `render time: ${renderTime.toFixed(0)}ms`;
       }
 
@@ -290,6 +339,8 @@
       async function run() {
         await init();
         let canvas = document.querySelector("#stage");
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
         render(canvas);
         enable_pan_zoom(canvas);
       }

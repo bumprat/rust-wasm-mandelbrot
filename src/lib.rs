@@ -119,7 +119,7 @@ impl Stage {
         let (xmin, ymin, xmax, ymax) = (
             self.center.0 - self.width as f64 / self.scale / 2., // xmin
             self.center.1 - self.height as f64 / self.scale / 2., // ymin
-            self.center.0 + self.height as f64 / self.scale / 2., // xmax
+            self.center.0 + self.width as f64 / self.scale / 2., // xmax
             self.center.1 + self.height as f64 / self.scale / 2., // ymax
         );
         (
