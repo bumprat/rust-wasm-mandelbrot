@@ -40,7 +40,7 @@ export default {
     color_shift: 16,
   },
   "storm center": {
-    max_iter: 100,
+    max_iter: 1000,
     centerx: 0.10681881930284597,
     centery: 0.63736808842004,
     scale: 13850669.808123196,
