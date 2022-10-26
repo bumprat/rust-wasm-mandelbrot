@@ -53,10 +53,25 @@
         width: 100%;
         font-size: 1em;
       }
+      #overlay {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background-color: black;
+        color: white;
+        opacity: 0.8;
+        text-align: center;
+        padding-top: 50vh;
+        font-size: 30pt;
+        z-index: 1;
+      }
     </style>
     <title>Mandelbrot Set</title>
   </head>
   <body>
+    <div id="overlay" style="display: none">Rendering...</div>
     <canvas id="stage" width="400" , height="400" style="touch-action: none">
     </canvas>
     <canvas id="oversample_stage" style="display: none"> </canvas>
@@ -374,23 +389,30 @@
 
       function render() {
         stage2ui();
-        const start = performance.now();
-        paint(
-          stage.max_iter,
-          stage.centerx,
-          stage.centery,
-          stage.scale,
-          stage.over_sample,
-          stage.color_step,
-          stage.color_number,
-          stage.color_shift
-        );
-        // document.querySelector("#console").innerHTML = JSON.stringify(stage);
-        const end = performance.now();
-        const renderTime = end - start;
-        transfer(0, 0, canvas.width, canvas.height);
-        const stageInfo = document.querySelector("#stage_info");
-        stageInfo.innerHTML = `render time: ${renderTime.toFixed(0)}ms`;
+        const overlay = document.querySelector("#overlay");
+        overlay.style.display = "block";
+        setTimeout(() => {
+          const start = performance.now();
+          paint(
+            stage.max_iter,
+            stage.centerx,
+            stage.centery,
+            stage.scale,
+            stage.over_sample,
+            stage.color_step,
+            stage.color_number,
+            stage.color_shift
+          );
+          // document.querySelector("#console").innerHTML = JSON.stringify(stage);
+          const end = performance.now();
+          const renderTime = end - start;
+          transfer(0, 0, canvas.width, canvas.height);
+          const stageInfo = document.querySelector("#stage_info");
+          stageInfo.innerHTML = `render time: ${renderTime.toFixed(0)}ms`;
+          setTimeout(() => {
+            overlay.style.display = "none";
+          });
+        });
       }
 
       async function run() {
