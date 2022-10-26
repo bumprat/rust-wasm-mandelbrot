@@ -194,18 +194,18 @@ function _assertNum(n) {
 * @param {number} center_x
 * @param {number} center_y
 * @param {number} scale
-* @param {number} super_sample_factor
+* @param {number} over_sample_factor
 * @param {number} color_step
 * @param {number} color_number
 * @param {number} color_shift
 */
-export function paint(max_iter, center_x, center_y, scale, super_sample_factor, color_step, color_number, color_shift) {
+export function paint(max_iter, center_x, center_y, scale, over_sample_factor, color_step, color_number, color_shift) {
     _assertNum(max_iter);
-    _assertNum(super_sample_factor);
+    _assertNum(over_sample_factor);
     _assertNum(color_step);
     _assertNum(color_number);
     _assertNum(color_shift);
-    wasm.paint(max_iter, center_x, center_y, scale, super_sample_factor, color_step, color_number, color_shift);
+    wasm.paint(max_iter, center_x, center_y, scale, over_sample_factor, color_step, color_number, color_shift);
 }
 
 /**

@@ -1,5 +1,5 @@
 use wasm_bindgen::{prelude::*, Clamped, JsCast};
-use web_sys::ImageData;
+use web_sys::{console, ImageData};
 
 #[wasm_bindgen]
 pub fn paint(
@@ -7,7 +7,7 @@ pub fn paint(
     center_x: f64,
     center_y: f64,
     scale: f64,
-    super_sample_factor: u32,
+    over_sample_factor: u32,
     color_step: u32,
     color_number: u32,
     color_shift: u32,
@@ -18,31 +18,32 @@ pub fn paint(
         .unwrap()
         .dyn_into::<web_sys::HtmlCanvasElement>()
         .unwrap();
-    let super_sample_canvas = document
-        .get_element_by_id("supersample")
+    let over_sample_canvas = document
+        .get_element_by_id("oversample_stage")
         .unwrap()
         .dyn_into::<web_sys::HtmlCanvasElement>()
         .unwrap();
-    let super_sample_context = super_sample_canvas
+    let over_sample_context = over_sample_canvas
         .get_context("2d")
         .unwrap()
         .unwrap()
         .dyn_into::<web_sys::CanvasRenderingContext2d>()
         .unwrap();
-    super_sample_canvas.set_width(super_sample_factor * canvas.width());
-    super_sample_canvas.set_height(super_sample_factor * canvas.height());
+    over_sample_canvas.set_width(over_sample_factor * canvas.width());
+    over_sample_canvas.set_height(over_sample_factor * canvas.height());
     let stage = Stage {
+        max_iter,
         center: (center_x, center_y),
-        scale: scale * super_sample_factor as f64,
-        width: super_sample_canvas.width(),
-        height: super_sample_canvas.height(),
+        scale: scale * over_sample_factor as f64,
+        width: over_sample_canvas.width(),
+        height: over_sample_canvas.height(),
         color_step,
         color_number,
         color_shift,
     };
-    let mandelbrot = Mandelbrot::new(max_iter, stage);
+    let mandelbrot = Mandelbrot::new(stage);
     let data = mandelbrot.gen_image_data();
-    super_sample_context.put_image_data(&data, 0., 0.).unwrap();
+    over_sample_context.put_image_data(&data, 0., 0.).unwrap();
 }
 
 #[wasm_bindgen]
@@ -59,19 +60,19 @@ pub fn transfer(dx: f64, dy: f64, dw: f64, dh: f64) {
         .unwrap()
         .dyn_into::<web_sys::CanvasRenderingContext2d>()
         .unwrap();
-    let super_sample_canvas = document
-        .get_element_by_id("supersample")
+    let over_sample_canvas = document
+        .get_element_by_id("oversample_stage")
         .unwrap()
         .dyn_into::<web_sys::HtmlCanvasElement>()
         .unwrap();
     context.clear_rect(0., 0., canvas.width() as f64, canvas.height() as f64);
     context
         .draw_image_with_html_canvas_element_and_sw_and_sh_and_dx_and_dy_and_dw_and_dh(
-            &super_sample_canvas,
+            &over_sample_canvas,
             0.,
             0.,
-            super_sample_canvas.width() as f64,
-            super_sample_canvas.height() as f64,
+            over_sample_canvas.width() as f64,
+            over_sample_canvas.height() as f64,
             dx as f64,
             dy as f64,
             dw as f64,
@@ -82,6 +83,7 @@ pub fn transfer(dx: f64, dy: f64, dw: f64, dh: f64) {
 
 #[derive(Copy, Clone)]
 pub struct Stage {
+    max_iter: u32,
     center: (f64, f64),
     scale: f64,
     width: u32,
@@ -93,6 +95,7 @@ pub struct Stage {
 
 impl Stage {
     pub fn new(
+        max_iter: u32,
         center_x: f64,
         center_y: f64,
         scale: f64,
@@ -103,6 +106,7 @@ impl Stage {
         color_shift: u32,
     ) -> Stage {
         Stage {
+            max_iter,
             center: (center_x, center_y),
             scale,
             width,
@@ -132,18 +136,17 @@ impl Stage {
 }
 
 pub struct Mandelbrot {
-    pub max_iter: u32,
     pub stage: Stage,
 }
 
 impl Mandelbrot {
-    fn new(max_iter: u32, stage: Stage) -> Mandelbrot {
-        Mandelbrot { max_iter, stage }
+    fn new(stage: Stage) -> Mandelbrot {
+        Mandelbrot { stage }
     }
     fn escape_time(&self, c: &ComplexNumber) -> u32 {
         let mut iter_count: u32 = 1;
         let mut z = c.to_owned();
-        while (iter_count < self.max_iter) && (z.modulus_square() <= 4.) {
+        while (iter_count < self.stage.max_iter) && (z.modulus_square() <= 4.) {
             z = z.square().add(c);
             iter_count += 1;
         }
@@ -184,7 +187,7 @@ impl Mandelbrot {
                 * 360.,
             // (shifted_n % self.stage.color_step + self.stage.color_step * 2) as f32 / (self.stage.color_step * 3) as f32,
             1.,
-            if n == self.max_iter {
+            if n == self.stage.max_iter {
                 0.
             } else {
                 (shifted_n % self.stage.color_step + self.stage.color_step) as f32
@@ -269,6 +272,7 @@ pub mod test {
     #[wasm_bindgen_test]
     pub fn mandelbrot_escape_time() {
         let stage = Stage {
+            max_iter: 100,
             center: (0., 0.),
             scale: 100.,
             width: 100,
@@ -277,13 +281,14 @@ pub mod test {
             color_number: 0,
             color_shift: 0,
         };
-        let a = Mandelbrot::new(100, stage);
+        let a = Mandelbrot::new(stage);
         let b = a.escape_time(&ComplexNumber::new(0., 0.));
         assert_eq!(b, 100);
     }
     #[wasm_bindgen_test]
     pub fn gen() {
         let stage = Stage {
+            max_iter: 100,
             center: (0., 0.),
             scale: 100.,
             width: 100,
@@ -292,7 +297,7 @@ pub mod test {
             color_number: 0,
             color_shift: 0,
         };
-        let a = Mandelbrot::new(100, stage);
+        let a = Mandelbrot::new(stage);
         let mut b = a.escape_time_iter();
         let c: Vec<u32> = b.as_mut().into_iter().filter(|x| *x > 1u32).collect();
         panic!("{:?}", c);

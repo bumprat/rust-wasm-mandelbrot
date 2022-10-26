@@ -5,12 +5,12 @@
 * @param {number} center_x
 * @param {number} center_y
 * @param {number} scale
-* @param {number} super_sample_factor
+* @param {number} over_sample_factor
 * @param {number} color_step
 * @param {number} color_number
 * @param {number} color_shift
 */
-export function paint(max_iter: number, center_x: number, center_y: number, scale: number, super_sample_factor: number, color_step: number, color_number: number, color_shift: number): void;
+export function paint(max_iter: number, center_x: number, center_y: number, scale: number, over_sample_factor: number, color_step: number, color_number: number, color_shift: number): void;
 /**
 * @param {number} dx
 * @param {number} dy

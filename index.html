@@ -23,6 +23,8 @@
         padding: 10px;
         opacity: 0.5;
         width: 100px;
+        max-height: 100vh;
+        overflow: auto;
       }
       #toolbox input {
         width: 80%;
@@ -42,21 +44,42 @@
         margin-top: 10px;
         margin-bottom: 10px;
       }
+      #favorites button {
+        width: 40%;
+        font-size: 1px;
+      }
+      #presets button,
+      #reset {
+        width: 100%;
+        font-size: 1em;
+      }
     </style>
     <title>Mandelbrot Set</title>
   </head>
   <body>
     <canvas id="stage" width="400" , height="400" style="touch-action: none">
     </canvas>
-    <canvas id="supersample" style="display: none"> </canvas>
+    <canvas id="oversample_stage" style="display: none"> </canvas>
     <div id="toolbox">
       <div>
         iteration:
         <input id="max_iter" type="number" />
       </div>
       <div>
-        oversample:
-        <input id="super_sample" type="number" />
+        centerx:
+        <input id="centerx" type="number" />
+      </div>
+      <div>
+        centery:
+        <input id="centery" type="number" />
+      </div>
+      <div>
+        scale:
+        <input id="scale" type="number" />
+      </div>
+      <div>
+        oversample:<br />1:speed<br />>=2:quality
+        <input id="over_sample" type="number" />
       </div>
       <div>
         color:
@@ -75,16 +98,21 @@
           </div>
         </div>
       </div>
+      <div>
+        <button id="reset">reset</button>
+      </div>
       <div id="favorites">
+        favorites:
+        <div id="presets"></div>
         <button id="favorite-add">add</button>
-        <button id="favorite-reset">reset</button>
+        <button id="favorite-reset">emp</button>
       </div>
       <div id="stage_info"></div>
       <div id="console"></div>
     </div>
     <script type="module">
       import init, { paint, transfer } from "./pkg/rust_wasm_mandelbrot.js";
-      const consolediv = document.querySelector("#console");
+      import presets from "./presets.js";
 
       const throttle = (fn, delay) => {
         let lastCalled = 0;
@@ -108,76 +136,83 @@
         };
       };
 
-      let favoriteAddBtn = document.querySelector("#favorite-add");
-      let favoriteResetBtn = document.querySelector("#favorite-reset");
-      let canvas = document.querySelector("#stage");
+      const canvas = document.querySelector("#stage");
       canvas.width = window.innerWidth;
       canvas.height = window.innerHeight;
-      let stage = {
-        centerx: 0,
-        centery: 0,
-        scale: Math.min(canvas.width, canvas.height) / 4,
-        superSampleFactor: 1,
-        color_step: 5,
-        color_number: 24,
-        color_shift: 16,
-      };
+      let stage;
 
-      const superSample = document.querySelector("#super_sample");
-      superSample.value = stage.superSampleFactor;
-      superSample.onchange = () => {
-        stage.superSampleFactor = parseInt(superSample.value);
-        render(document.querySelector("#stage"));
-      };
+      function stage2ui() {
+        Object.keys(stage).forEach((key) => {
+          document.querySelector(`#${key}`).value = stage[key];
+        });
+      }
 
-      const maxIter = document.querySelector("#max_iter");
-      let max_iter = 100;
-      maxIter.value = max_iter;
-      maxIter.onchange = () => {
-        max_iter = parseInt(maxIter.value);
-        render(document.querySelector("#stage"));
-      };
+      function stage_ui() {
+        let ui = {};
+        Object.keys(stage).forEach((key) => {
+          const element = document.querySelector(`#${key}`);
+          element.onchange = () => {
+            stage[key] = parseFloat(document.querySelector(`#${key}`).value);
+            render();
+          };
+          ui[key] = element;
+        });
 
-      const color_step = document.querySelector("#color_step");
-      const color_number = document.querySelector("#color_number");
-      const color_shift = document.querySelector("#color_shift");
-      color_step.value = stage.color_step;
-      color_step.onchange = () => {
-        stage.color_step = parseInt(color_step.value);
-        render(document.querySelector("#stage"));
-      };
-      color_number.value = stage.color_number;
-      color_number.onchange = () => {
-        stage.color_number = parseInt(color_number.value);
-        render(document.querySelector("#stage"));
-      };
-      color_shift.value = stage.color_shift;
-      color_shift.onchange = () => {
-        stage.color_shift = parseInt(color_shift.value);
-        render(document.querySelector("#stage"));
-      };
-      const stageInfo = document.querySelector("#stage_info");
-      function render(canvas) {
-        const start = performance.now();
-        paint(
-          max_iter,
-          stage.centerx,
-          stage.centery,
-          stage.scale,
-          stage.superSampleFactor,
-          stage.color_step,
-          stage.color_number,
-          stage.color_shift
-        );
-        document.querySelector("#console").innerHTML = JSON.stringify(stage);
-        const end = performance.now();
-        const renderTime = end - start;
-        transfer(0, 0, canvas.width, canvas.height);
-        let centerx = stage.centerx.toExponential(2);
-        let centery = stage.centery.toExponential(2);
-        stageInfo.innerHTML = `center: (${centerx}, ${centery})<br/>`;
-        stageInfo.innerHTML += `scale: ${stage.scale.toFixed(0)}<br/>`;
-        stageInfo.innerHTML += `render time: ${renderTime.toFixed(0)}ms`;
+        const consolediv = document.querySelector("#console");
+        let favoriteAddBtn = document.querySelector("#favorite-add");
+        let favoriteResetBtn = document.querySelector("#favorite-reset");
+        const presetsEl = document.querySelector("#presets");
+        let userFavs;
+        try {
+          userFavs = JSON.parse(localStorage.getItem("userFavs")) || {};
+        } catch {
+          userFavs = {};
+        }
+        function renderFav() {
+          let combinedPresets = {};
+          Object.assign(combinedPresets, presets, userFavs);
+          presetsEl.innerHTML = "";
+          for (let name of Object.keys(combinedPresets)) {
+            const presetBtn = document.createElement("button");
+            presetBtn.innerHTML = name;
+            presetBtn.onclick = function () {
+              Object.keys(stage).forEach(
+                (key) => (stage[key] = combinedPresets[name][key])
+              );
+              stage2ui();
+              render();
+            };
+            presetsEl.append(presetBtn);
+          }
+        }
+        renderFav();
+        favoriteAddBtn.onclick = () => {
+          userFavs["user " + (Object.keys(userFavs).length + 1)] =
+            Object.assign({}, stage);
+          localStorage.setItem("userFavs", JSON.stringify(userFavs));
+          renderFav();
+        };
+        favoriteResetBtn.onclick = () => {
+          userFavs = {};
+          localStorage.setItem("userFavs", JSON.stringify(userFavs));
+          renderFav();
+        };
+        const reset = document.querySelector("#reset");
+        reset.onclick = resetStage;
+      }
+
+      function resetStage() {
+        stage = {
+          max_iter: 100,
+          centerx: 0,
+          centery: 0,
+          scale: Math.min(canvas.width, canvas.height) / 4,
+          over_sample: 1,
+          color_step: 5,
+          color_number: 24,
+          color_shift: 16,
+        };
+        render();
       }
 
       function enable_pan_zoom(canvas) {
@@ -282,7 +317,7 @@
                   deltaMovement[1]) /
                   stage.scale;
               stage.scale *= zoomFactor;
-              render(canvas);
+              render();
               zoomFactor = 1;
             }
             evCache.splice(index, 1);
@@ -308,7 +343,7 @@
           stage.centery +=
             (((scrollZoomFactor - 1) * canvas.height) / 2 + topLeftPoint[1]) /
             stage.scale;
-          render(canvas);
+          render();
           topLeftPoint = [0, 0];
           scrollZoomFactor = 1;
         });
@@ -336,12 +371,33 @@
         canvas.onpointerleave = end;
         canvas.onwheel = wheel;
       }
+
+      function render() {
+        stage2ui();
+        const start = performance.now();
+        paint(
+          stage.max_iter,
+          stage.centerx,
+          stage.centery,
+          stage.scale,
+          stage.over_sample,
+          stage.color_step,
+          stage.color_number,
+          stage.color_shift
+        );
+        // document.querySelector("#console").innerHTML = JSON.stringify(stage);
+        const end = performance.now();
+        const renderTime = end - start;
+        transfer(0, 0, canvas.width, canvas.height);
+        const stageInfo = document.querySelector("#stage_info");
+        stageInfo.innerHTML = `render time: ${renderTime.toFixed(0)}ms`;
+      }
+
       async function run() {
         await init();
-        let canvas = document.querySelector("#stage");
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
-        render(canvas);
+        resetStage();
+        stage_ui();
+        render();
         enable_pan_zoom(canvas);
       }
       run();
