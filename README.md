@@ -2,9 +2,9 @@
 
 ## Description
 
-1. web app for explore Mandelbrot set
+1. web app for exploring Mandelbrot set
 1. Rust for wasm, vanilla Javascript for web ui
-1. 64bit-floating-point precision limit
+1. 64bit-floating-point precision
 
 ## Demo
 
