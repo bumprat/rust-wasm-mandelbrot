@@ -387,11 +387,11 @@
         canvas.onwheel = wheel;
       }
 
-      function render() {
+      async function render() {
         stage2ui();
         const overlay = document.querySelector("#overlay");
         overlay.style.display = "block";
-        setTimeout(() => {
+        setTimeout(async () => {
           const start = performance.now();
           paint(
             stage.max_iter,
@@ -412,14 +412,14 @@
           setTimeout(() => {
             overlay.style.display = "none";
           });
-        });
+        }, 100);
       }
 
       async function run() {
         await init();
         resetStage();
         stage_ui();
-        render();
+        await render();
         enable_pan_zoom(canvas);
       }
       run();
