@@ -49,4 +49,14 @@ export default {
     color_number: 24,
     color_shift: 8,
   },
+  city: {
+    max_iter: 1000,
+    centerx: 0.10683787780870521,
+    centery: 0.637383114070486,
+    scale: 1585561797.2174225,
+    over_sample: 2,
+    color_step: 5,
+    color_number: 24,
+    color_shift: 8,
+  },
 };

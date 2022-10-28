@@ -239,25 +239,25 @@
           let prev_avg_x =
             evCache.length == 0
               ? 0
-              : evCache.map((e) => e.clientX).reduce((v, s) => v + s, 0) /
+              : evCache.map((e) => e.offsetX).reduce((v, s) => v + s, 0) /
                 evCache.length;
           let prev_avg_y =
             evCache.length == 0
               ? 0
-              : evCache.map((e) => e.clientY).reduce((v, s) => v + s, 0) /
+              : evCache.map((e) => e.offsetY).reduce((v, s) => v + s, 0) /
                 evCache.length;
           basePoint = [
             basePoint[0] +
-              (ev.clientX - prev_avg_x) / (evCache.length + 1) / zoomFactor,
+              (ev.offsetX - prev_avg_x) / (evCache.length + 1) / zoomFactor,
             basePoint[1] +
-              (ev.clientY - prev_avg_y) / (evCache.length + 1) / zoomFactor,
+              (ev.offsetY - prev_avg_y) / (evCache.length + 1) / zoomFactor,
           ];
           evCache.push(ev);
 
-          let min_x = Math.min(...evCache.map((e) => e.clientX));
-          let min_y = Math.min(...evCache.map((e) => e.clientY));
-          let max_x = Math.max(...evCache.map((e) => e.clientX));
-          let max_y = Math.max(...evCache.map((e) => e.clientY));
+          let min_x = Math.min(...evCache.map((e) => e.offsetX));
+          let min_y = Math.min(...evCache.map((e) => e.offsetY));
+          let max_x = Math.max(...evCache.map((e) => e.offsetX));
+          let max_y = Math.max(...evCache.map((e) => e.offsetY));
           baseDistance =
             Math.sqrt(
               (max_y - min_y) * (max_y - min_y) +
@@ -271,15 +271,15 @@
           );
           index >= 0 && evCache.splice(index, 1, ev);
           let avg_x =
-            evCache.map((e) => e.clientX).reduce((v, s) => v + s, 0) /
+            evCache.map((e) => e.offsetX).reduce((v, s) => v + s, 0) /
             evCache.length;
           let avg_y =
-            evCache.map((e) => e.clientY).reduce((v, s) => v + s, 0) /
+            evCache.map((e) => e.offsetY).reduce((v, s) => v + s, 0) /
             evCache.length;
-          let min_x = Math.min(...evCache.map((e) => e.clientX));
-          let min_y = Math.min(...evCache.map((e) => e.clientY));
-          let max_x = Math.max(...evCache.map((e) => e.clientX));
-          let max_y = Math.max(...evCache.map((e) => e.clientY));
+          let min_x = Math.min(...evCache.map((e) => e.offsetX));
+          let min_y = Math.min(...evCache.map((e) => e.offsetY));
+          let max_x = Math.max(...evCache.map((e) => e.offsetX));
+          let max_y = Math.max(...evCache.map((e) => e.offsetY));
           let distance = Math.sqrt(
             (max_y - min_y) * (max_y - min_y) +
               (max_x - min_x) * (max_x - min_x)
@@ -302,32 +302,32 @@
             // end can be fired multiple times when pointerleave
             if (evCache.length > 1) {
               let prev_avg_x =
-                evCache.map((e) => e.clientX).reduce((v, s) => v + s) /
+                evCache.map((e) => e.offsetX).reduce((v, s) => v + s) /
                 evCache.length;
               let prev_avg_y =
-                evCache.map((e) => e.clientY).reduce((v, s) => v + s) /
+                evCache.map((e) => e.offsetY).reduce((v, s) => v + s) /
                 evCache.length;
               basePoint = [
                 basePoint[0] +
-                  (prev_avg_x - ev.clientX) / (evCache.length - 1) / zoomFactor,
+                  (prev_avg_x - ev.offsetX) / (evCache.length - 1) / zoomFactor,
                 basePoint[1] +
-                  (prev_avg_y - ev.clientY) / (evCache.length - 1) / zoomFactor,
+                  (prev_avg_y - ev.offsetY) / (evCache.length - 1) / zoomFactor,
               ];
             } else if (evCache.length == 1) {
               let deltaMovement = [
-                ev.clientX - basePoint[0],
-                ev.clientY - basePoint[1],
+                ev.offsetX - basePoint[0],
+                ev.offsetY - basePoint[1],
               ];
               basePoint = [0, 0];
               stage.centerx =
                 stage.centerx +
-                (((ev.clientX - canvas.width / 2) * (zoomFactor - 1)) /
+                (((ev.offsetX - canvas.width / 2) * (zoomFactor - 1)) /
                   zoomFactor -
                   deltaMovement[0]) /
                   stage.scale;
               stage.centery =
                 stage.centery -
-                (((ev.clientY - canvas.height / 2) * (zoomFactor - 1)) /
+                (((ev.offsetY - canvas.height / 2) * (zoomFactor - 1)) /
                   zoomFactor -
                   deltaMovement[1]) /
                   stage.scale;
@@ -336,10 +336,10 @@
               zoomFactor = 1;
             }
             evCache.splice(index, 1);
-            let min_x = Math.min(...evCache.map((e) => e.clientX));
-            let min_y = Math.min(...evCache.map((e) => e.clientY));
-            let max_x = Math.max(...evCache.map((e) => e.clientX));
-            let max_y = Math.max(...evCache.map((e) => e.clientY));
+            let min_x = Math.min(...evCache.map((e) => e.offsetX));
+            let min_y = Math.min(...evCache.map((e) => e.offsetY));
+            let max_x = Math.max(...evCache.map((e) => e.offsetX));
+            let max_y = Math.max(...evCache.map((e) => e.offsetY));
             let distance = Math.sqrt(
               (max_y - min_y) * (max_y - min_y) +
                 (max_x - min_x) * (max_x - min_x)
@@ -366,8 +366,8 @@
           let zoomFactor = ev.deltaY < 0 ? 1.2 : 0.9;
           scrollZoomFactor *= zoomFactor;
           topLeftPoint = [
-            ev.clientX - zoomFactor * (ev.clientX - topLeftPoint[0]),
-            ev.clientY - zoomFactor * (ev.clientY - topLeftPoint[1]),
+            ev.offsetX - zoomFactor * (ev.offsetX - topLeftPoint[0]),
+            ev.offsetY - zoomFactor * (ev.offsetY - topLeftPoint[1]),
           ];
           transfer(
             topLeftPoint[0],

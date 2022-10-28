@@ -1,5 +1,5 @@
 use wasm_bindgen::{prelude::*, Clamped, JsCast};
-use web_sys::{console, ImageData};
+use web_sys::ImageData;
 
 #[wasm_bindgen]
 pub fn paint(
